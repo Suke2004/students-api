@@ -1,0 +1,5 @@
+env: "dev"
+storage_path: "storage/storage.db"
+http_server:
+  address: "localhost:8082"
+  #timeout: is optional its your with to add or not

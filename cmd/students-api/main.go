@@ -10,8 +10,8 @@ import (
 	"os/signal"
 	"syscall"
 	"time"
-
 	"github.com/Suke2004/students-api/internal/config"
+	"github.com/Suke2004/students-api/internal/http/handlers/student"
 )
 
 func main() {
@@ -22,9 +22,7 @@ func main() {
 
 	//setup router
 	router := http.NewServeMux() //response w,     request r
-	router.HandleFunc("GET /", func(w http.ResponseWriter, r *http.Request) {
-		w.Write([]byte("Welcome to students api"))
-	})
+	router.HandleFunc("POST /api/students", student.New())
 
 	//setup server
 	server := http.Server{
@@ -56,11 +54,6 @@ func main() {
 	slog.Info("Server shutdown sucessfully")
 
 }
-
-
-
-
-
 
 //Alternative code for above
 // package main

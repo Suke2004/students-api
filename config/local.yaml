@@ -3,3 +3,15 @@ storage_path: "storage/storage.db"
 http_server:
   address: "localhost:8082"
   #timeout: is optional its your with to add or not
+
+mongodb:
+  uri: "mongodb://localhost:27017"
+  database: "students_api"
+
+postgres:
+  host: "localhost"
+  port: "5432"
+  user: "your_username"
+  password: "your_password"
+  dbname: "students_api"
+  sslmode: "disable"

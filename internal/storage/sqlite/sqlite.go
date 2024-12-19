@@ -62,7 +62,7 @@ func (s *Sqlite) CreateStudent(name string, email string, age int) (int64, error
 
 }
 
-func (s *Sqlite) GetStudent(id int64) (types.Student, error) {
+func (s *Sqlite) GetStudentById(id int64) (types.Student, error) {
 	//sql query
 	stmt, err := s.Db.Prepare("SELECT * FROM students WHERE id = ? LIMIT 1")
 	if err != nil {
@@ -81,4 +81,116 @@ func (s *Sqlite) GetStudent(id int64) (types.Student, error) {
 	}
 
 	return student, nil
+}
+
+func (s *Sqlite) GetStudent() ([]types.Student, error) {
+	stmt, err := s.Db.Prepare("SELECT id,name,email,age FROM students")
+	if err != nil {
+		return nil, err
+	}
+
+	defer stmt.Close()
+
+	rows, err := stmt.Query()
+	if err != nil {
+		return nil, err
+	}
+
+	defer rows.Close()
+
+	var students []types.Student
+
+	for rows.Next() {
+		var student types.Student
+
+		err := rows.Scan(&student.Id, &student.Name, &student.Email, &student.Age)
+		if err != nil {
+			return nil, err
+		}
+
+		students = append(students, student)
+
+	}
+	return students, nil
+}
+
+// DeleteStudentById deletes a student by their ID.
+func (s *Sqlite) DeleteStudentById(id int64) error {
+	stmt, err := s.Db.Prepare("DELETE FROM students WHERE id = ?")
+	if err != nil {
+		return err
+	}
+	defer stmt.Close()
+
+	_, err = stmt.Exec(id)
+	if err != nil {
+		return err
+	}
+	// // Reindex the table to maintain a continuous sequence
+	// err = s.reindexTable()
+	// if err != nil {    //If wanted to auto reindex the table if a middle value is deleted use this
+	// 	return err
+	// }
+
+	return nil
+}
+
+// DeleteAllStudents deletes all students from the database.
+func (s *Sqlite) DeleteAllStudents() error {
+	stmt, err := s.Db.Prepare("DELETE FROM students")
+	if err != nil {
+		return err
+	}
+	defer stmt.Close()
+
+	_, err = stmt.Exec()
+	if err != nil {
+		return err
+	}
+
+	_, err = s.Db.Exec("UPDATE sqlite_sequence SET seq = 0 WHERE name = 'students'")
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// UpdateStudentById updates a student's data by their ID.
+func (s *Sqlite) UpdateStudentById(id int64, name, email string, age int) error {
+	stmt, err := s.Db.Prepare("UPDATE students SET name = ?, email = ?, age = ? WHERE id = ?")
+	if err != nil {
+		return err
+	}
+	defer stmt.Close()
+
+	_, err = stmt.Exec(name, email, age, id)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// reindexTable reorders the IDs to maintain a continuous sequence.
+func (s *Sqlite) reindexTable() error {
+	tx, err := s.Db.Begin()
+	if err != nil {
+		return err
+	}
+
+	// Use a temporary table to reorder IDs
+	_, err = tx.Exec(`
+		CREATE TEMPORARY TABLE temp_students AS SELECT * FROM students ORDER BY id;
+		DELETE FROM students;
+		INSERT INTO students (id, name, email, age)
+		SELECT ROW_NUMBER() OVER (ORDER BY id), name, email, age FROM temp_students;
+		DROP TABLE temp_students;
+	`)
+	if err != nil {
+		tx.Rollback()
+		return err
+	}
+
+	return tx.Commit()
 }

@@ -30,8 +30,12 @@ func main() {
 
 	//setup router
 	router := http.NewServeMux() //response w,     request r
-	router.HandleFunc("POST /api/students", student.New(storage))
+	router.HandleFunc("POST /api/students/", student.New(storage))
 	router.HandleFunc("GET /api/students/{id}", student.GetById(storage))
+	router.HandleFunc("GET /api/students/", student.GetList(storage))
+	router.HandleFunc("DELETE /api/students/{id}", student.DeleteById(storage))
+	router.HandleFunc("DELETE /api/students/", student.DeleteAll(storage))
+	router.HandleFunc("PUT /api/students/{id}", student.UpdateById(storage))
 
 	//setup server
 	server := http.Server{
@@ -64,69 +68,107 @@ func main() {
 
 }
 
-//Alternative code for above
+
+//Mongo db
+
 // package main
 
 // import (
-// 	"context"
 // 	"fmt"
-// 	"log/slog"
+// 	"log"
 // 	"net/http"
-// 	"os"
-// 	"os/signal"
-// 	"syscall"
-// 	"time"
 
 // 	"github.com/Suke2004/students-api/internal/config"
+// 	"github.com/Suke2004/students-api/internal/handler"
+// 	"github.com/Suke2004/students-api/internal/storage/mongodb"
 // )
 
 // func main() {
-// 	// Load config
-// 	cfg := config.MustLoad()
-
-// 	// Setup router
-// 	router := http.NewServeMux() // response w, request r
-// 	router.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-// 		w.Write([]byte("Welcome to students api"))
-// 	})
-
-// 	// Setup server
-// 	server := http.Server{
-// 		Addr:    cfg.HTTPServer.Addr,
-// 		Handler: router,
+// 	// Load configuration
+// 	cfg := &config.Config{
+// 		Port: "8080",
+// 		MongoDB: struct {
+// 			URI      string
+// 			Database string
+// 		}{
+// 			URI:      "mongodb://localhost:27017",
+// 			Database: "students_api",
+// 		},
 // 	}
 
-// 	// Log the server start
-// 	slog.Info("Server started", slog.String("address", cfg.HTTPServer.Addr))
-// 	fmt.Printf("Server started on %s\n", cfg.HTTPServer.Addr)
-
-// 	// Channel to listen for interrupt signals
-// 	done := make(chan os.Signal, 1)
-// 	signal.Notify(done, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
-
-// 	// Run the server in a goroutine
-// 	go func() {
-// 		err := server.ListenAndServe()
-// 		if err != nil && err != http.ErrServerClosed {
-// 			// If the server fails, log the error
-// 			slog.Error("Server failed to start", slog.String("error", err.Error()))
+// 	// Initialize MongoDB
+// 	db, err := mongodb.New(cfg)
+// 	if err != nil {
+// 		log.Fatalf("Failed to initialize MongoDB: %v", err)
+// 	}
+// 	defer func() {
+// 		if err := db.Client.Disconnect(nil); err != nil {
+// 			log.Fatalf("Failed to disconnect MongoDB client: %v", err)
 // 		}
 // 	}()
 
-// 	// Wait for shutdown signal
-// 	sigReceived := <-done
-// 	slog.Info("Shutdown signal received", slog.String("signal", sigReceived.String()))
+// 	// Initialize API handlers
+// 	studentHandler := handler.NewStudentHandler(db)
 
-// 	// Graceful shutdown with a 5-second timeout
-// 	slog.Info("Shutting down the server gracefully")
+// 	// Setup routes
+// 	http.HandleFunc("/students", studentHandler.HandleStudents)       // GET/POST
+// 	http.HandleFunc("/students/", studentHandler.HandleStudentById)  // GET/PUT/DELETE
 
-// 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second) // Gracefully wait for 5 seconds for ongoing requests to complete
-// 	defer cancel()
+// 	// Start server
+// 	fmt.Printf("Server is running on port %s\n", cfg.Port)
+// 	log.Fatal(http.ListenAndServe(":"+cfg.Port, nil))
+// }
 
-// 	// Attempt to shut down the server
-// 	if err := server.Shutdown(ctx); err != nil {
-// 		slog.Error("Failed to shut down the server", slog.String("error", err.Error()))
-// 	} else {
-// 		slog.Info("Server shutdown successfully")
+
+//PostgreSQL
+
+// package main
+
+// import (
+// 	"fmt"
+// 	"log"
+// 	"net/http"
+
+// 	"github.com/Suke2004/students-api/internal/config"
+// 	"github.com/Suke2004/students-api/internal/handler"
+// 	"github.com/Suke2004/students-api/internal/storage/postgresql"
+// )
+
+// func main() {
+// 	// Load configuration
+// 	cfg := &config.Config{
+// 		Postgres: struct {
+// 			Host     string
+// 			Port     string
+// 			User     string
+// 			Password string
+// 			DbName   string
+// 			SSLMode  string
+// 		}{
+// 			Host:     "localhost",
+// 			Port:     "5432",
+// 			User:     "your_username",
+// 			Password: "your_password",
+// 			DbName:   "students_api",
+// 			SSLMode:  "disable",
+// 		},
 // 	}
+
+// 	// Initialize PostgreSQL
+// 	db, err := postgresql.New(cfg)
+// 	if err != nil {
+// 		log.Fatalf("Failed to initialize PostgreSQL: %v", err)
+// 	}
+// 	defer db.Db.Close()
+
+// 	// Initialize API handlers
+// 	studentHandler := handler.NewStudentHandler(db)
+
+// 	// Setup routes
+// 	http.HandleFunc("/students", studentHandler.HandleStudents)       // GET/POST
+// 	http.HandleFunc("/students/", studentHandler.HandleStudentById)  // GET/PUT/DELETE
+
+// 	// Start server
+// 	fmt.Printf("Server is running on port %s\n", "8080")
+// 	log.Fatal(http.ListenAndServe(":8080", nil))
 // }
